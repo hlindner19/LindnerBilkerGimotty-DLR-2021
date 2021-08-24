@@ -1,0 +1,350 @@
+---
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+functions
+```{r}
+#functions
+
+#MLR model function, no additional covariates
+MCL<-function(data, blocks, blocksize, ref.grp, plot.param){
+  colnames(data)<-c('marker', 'class')
+  ds1sort<-data[order(data$marker),]
+  #create equally sized groups of size BLOCKS to calculate DRL
+  ds1sort$group<-c(rep(1:(blocks-1), each=blocksize), rep(blocks, times=blocksize-(blocks*blocksize-nrow(ds1sort))))
+  #choose reference group
+  ds1sort$categoryRef<-ifelse(ds1sort$group==ref.grp, 0, ds1sort$group)
+  #fit model
+  f1<-multinom(ds1sort$categoryRef ~ ds1sort$class, trace=FALSE)
+  f2<-multinom(ds1sort$categoryRef ~ 1, trace=FALSE)
+  an_f1f2_pval<-anova(f1, f2)[2,7]
+  an_f1f2_TS<-anova(f1, f2)[2,6]
+  
+  
+  #do wald test for parameters
+  z <- summary(f1)$coefficients/summary(f1)$standard.errors
+  # 2-tailed z test
+  p <- (1 - pnorm(abs(z), 0, 1)) * 2
+  p<-round(p, digits=4)
+  #summarize model into table
+  f1sum<-cbind(summary(f1)$coefficients, summary(f1)$standard.errors, exp(coef(f1)), z, p)
+  colnames(f1sum)<-c("intercept", "beta", "SE(int)", "SE(beta)", "exp(int)", "exp(beta)", "int.Z", "beta.Z", "int.P", "beta.P")
+  DLRJ<-(1+sum(exp(f1sum[,1]+f1sum[,2])))/(1+sum(f1sum[,5]))
+  f1sum<-cbind(f1sum, DLRJ, an_f1f2_pval, an_f1f2_TS)
+  
+  colAUC(ds1sort$group, ds1sort$class, plotROC = plot.param)
+  if(plot.param=='T'){
+    abline(a=0, b=1)
+  }
+  return(f1sum)
+}
+#DLR calculated by contingency table, gives endpoints of all intervals
+DLR<-function(data, blocks, blocksize){
+  colnames(data)<-c('marker', 'class')
+  ds1sort<-data[order(data$marker),]
+  #create equally sized groups of size BLOCKS to calculate DRL
+  ds1sort$group<-c(rep(1:(blocks-1), each=blocksize), rep(blocks, times=blocksize-(blocks*blocksize-nrow(ds1sort))))
+  mat.all<-NULL
+  min.all<-NULL
+  max.all<-NULL
+  for(i in 1:blocks){
+    data_sub<-subset(ds1sort, ds1sort$group==i)
+    min.range<-min(data_sub$marker)
+    max.range<-max(data_sub$marker)
+    min.all<-c(min.all, min.range)
+    max.all<-c(max.all, max.range)
+  }
+  mat.all<-cbind(t(table(ds1sort$class, ds1sort$group)), min.all, max.all)
+  N<-sum(mat.all[,1])
+  P<-sum(mat.all[,2])
+  DLR<-(mat.all[,2]/P)/(mat.all[,1]/N)
+  mat.all<-cbind(mat.all[,1:2], DLR, mat.all[,3:4])
+  colnames(mat.all)<-c("control", "case", "DLR", "min. of range", "max. of range")
+  return(mat.all)
+}
+#Fit MLR model with a second categorical main effect
+MCL_covar1_cat<-function(data, blocks, blocksize, ref.grp){
+  colnames(data)<-c('marker', 'class', 'covar')
+  ds1sort<-data[order(data$marker),]
+  #create equally sized groups of size BLOCKS to calculate DRL
+  ds1sort$group<-c(rep(1:(blocks-1), each=blocksize), rep(blocks, times=blocksize-(blocks*blocksize-nrow(ds1sort))))
+  #choose reference group
+  ds1sort$categoryRef<-ifelse(ds1sort$group==ref.grp, 0, ds1sort$group)
+  #fit model
+  f03<-multinom(ds1sort$categoryRef ~ ds1sort$class + factor(ds1sort$covar), trace=F)
+  f_null<-multinom(ds1sort$categoryRef ~ ds1sort$class, trace=F)
+  an_f1f2_pval<-anova(f03, f_null)[2,7]
+  an_f1f2_TS<-anova(f03, f_null)[2,6]
+  
+  #do wald test for parameters
+  z <- summary(f03)$coefficients/summary(f03)$standard.errors
+  # 2-tailed z test
+  p <- (1 - pnorm(abs(z), 0, 1)) * 2
+  p<-round(p, digits=4)
+  #summarize model into table
+  f1sum<-cbind(summary(f03)$coefficients, summary(f03)$standard.errors, exp(coef(f03)), z, p)
+  f1sum<-cbind(f1sum, an_f1f2_TS, an_f1f2_pval)
+  return(f1sum)
+}
+#Cochran-Armitage test with 6 intervals
+CA_test_6<-function(dat1, weights, blocksize){
+  ds1sort<-data.frame(dat1[order(dat1[,1]),])
+  #create equally sized groups of size BLOCKS to calculate DRL
+  ds1sort$group<-c(rep(1:(6-1), each=blocksize), rep(6, times=blocksize+abs((6*blocksize-nrow(ds1sort)))))
+  
+  t1<-table(ds1sort[,2], ds1sort$group)
+  R1<-sum(t1[1,])
+  R2<-sum(t1[2,])
+  Ci<-c(sum(t1[,1]), sum(t1[,2]),sum(t1[,3]),sum(t1[,4]),sum(t1[,5]),sum(t1[,6]))
+  
+  weights<-weights
+  
+  CA_TS<-sum(weights*(t1[1,]*R2-t1[2,]*R1))
+  
+  V1<-(weights[1]*Ci[1])*(weights[2]*Ci[2] + weights[3]*Ci[3] + weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6])
+  V2<-(weights[2]*Ci[2])*(weights[3]*Ci[3] + weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6])
+  V3<-(weights[3]*Ci[3])*(weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6])
+  V4<-(weights[4]*Ci[4])*(weights[5]*Ci[5] + weights[6]*Ci[6])
+  V5<-(weights[5]*Ci[5])*(weights[6]*Ci[6])
+  Vi<-sum(V1, V2, V3, V4, V5)
+  
+  CA_Var<-((R1*R2)/nrow(dat1))*(sum(((weights**2)*Ci)*(sum(t1[,])-Ci)) - (2*Vi))
+  
+  q<-abs(CA_TS/sqrt(CA_Var))
+  
+  p.val<-pnorm(q, lower.tail = F)*2
+  
+  return(list(CA_TS/sqrt(CA_Var), p.val))
+}
+
+library(readxl); library(mcp.project); library(caTools); library(nnet);library(msm);library(pROC);library(xtable);library(plyr)
+```
+
+
+read in data and create outcome
+```{r}
+dov<-read_excel("VAN_HGSOC.xlsx")
+table(dov$Stage)
+dov<-subset(dov, dov$Stage!=8)
+dov$Stage<-ifelse(dov$Stage==1, 0, 1) #recode stage
+```
+
+LR test
+```{r}
+dov<-data.frame(dov)
+#apply LRT to all genes
+an_pv_all<-NULL
+for(i in 14:526){ #markers start at column 14
+  fit1<-MCL(dov[,c(i,8)], 6, 66, 6, 'F')[1,12]
+  an_pv_all<-c(an_pv_all, fit1)
+}
+
+#get adjusted p-values
+adj_pval<-fdr(an_pv_all, method='BH', q=.05)
+table(adj_pval$Pvals$rejected) #136 rejections
+sig_genes<-which(adj_pval$Pvals$rejected==T)+13 #gives column number of dov for sig genes
+```
+
+
+CA test
+```{r}
+CAtest_all<-NULL
+for(i in sig_genes){
+  CA_trad<-CA_test_6(cbind(dov[,i], dov[,8]), c(1:6), 66)[[2]]
+  CA_nt<-CA_test_6(cbind(dov[,i], dov[,8]), c(3,2,1,1,2,3), 66)[[2]]
+  
+  if(CA_trad<CA_nt){
+    CA_res<-'T'
+  } else{
+    CA_res<-'NT'
+  }
+
+  CAtest_all<-c(CAtest_all, CA_res)
+}
+
+trad_genes<-sig_genes[which(CAtest_all=='T')] #column # of dov with traditional sig. genes
+nt_genes<-sig_genes[which(CAtest_all=='NT')] #column # of dov with nontraditional sig. genes
+```
+
+AUC test
+```{r}
+auc_test_all<-NULL
+for(i in 14:526){
+    auc_test<-wilcox.test(subset(dov, dov$Stage==1)[,i], subset(dov, dov$Stage==0)[,i])$`p.val`
+    auc_test_all<-c(auc_test_all, auc_test)
+}
+
+#adjust for multiple testing
+table(ifelse(auc_test_all <0.05, 1, 0))
+adj_pval_auc<-fdr(auc_test_all, method='BH', q=.05)
+table(adj_pval_auc$Pvals$rejected) #136 rejections
+sig_genes_auc<-which(adj_pval_auc$Pvals$rejected==T)+13 #column #s of significant genes by AUC
+```
+
+Compare LRT rejections to AUC rejections
+```{r}
+table(adj_pval_auc$Pvals$rejected, adj_pval$Pvals$rejected)
+#auc as rows, LRT as column
+#they agreed on rejecting 115
+#21 that LRT thought were important that AUC didnt
+#51 that AUC thought were important that AUC didnt
+#326 they agreed on failing to reject
+
+#look at the 21 AUC missed
+discord_pairs<-ifelse(adj_pval_auc$Pvals$rejected==F & adj_pval$Pvals$rejected==T, 1, 0)
+auc_miss<-which(discord_pairs==1)+13 #column numbers of the biomarkers the AUC test missed compared to the LR test
+```
+
+
+Plot the 21 AUC missed
+```{r}
+for(i in auc_miss){
+  colAUC(dov[,i], dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+#14 out of the 21 were on the NT list
+sum(auc_miss %in% nt_genes)/length(auc_miss)
+
+#The 14 account for what percentage of the total number of NTBs?
+sum(auc_miss %in% nt_genes)/length(nt_genes)
+```
+
+Find most significant traditional and nontraditional with a clear cross point by LRT
+```{r}
+ordered_lrt<-cbind(1:513, adj_pval$Pvals)[order(adj_pval$Pvals$adjusted.pvals),]
+ordered_lrt$`1:513` %in% (nt_genes-13)
+#1st entry is a traditional
+#first nontraditional is #34
+ordered_lrt[1,] #G429 is the most significant traditional
+sig_trad<-ordered_lrt[1,1] + 13 #Column # of dov
+ordered_lrt[48,] #G178 is the most significant nontraditional with clear cross point
+sig_nontrad<-ordered_lrt[48,1] + 13 #column # of dov
+```
+
+
+Plots of most significant traditional and nontraditional
+```{r}
+par(mfrow=c(2,2))
+fit1<-MCL(dov[,c(sig_trad,8)], 6, 66, 6, 'F')
+DLR_val<-c(fit1[,6]/fit1[1,11], 1/fit1[1,11])
+
+bins<-DLR(dov[,c(sig_trad,8)], 6, 66)
+par(mfrow=c(2,2))
+plot(seq(bins[1,4], bins[1,5], length.out = 2), rep(DLR_val[1], times=2), type='l', 
+     ylim=c(0,8.5), xlim=c(bins[1,4], bins[6,5]), ylab = 'DLR', xlab = 'Marker', main='Gene: PCDH9')
+lines(seq(bins[2,4], bins[2,5], length.out = 2), rep(DLR_val[2], times=2))
+lines(seq(bins[3,4], bins[3,5], length.out = 2), rep(DLR_val[3], times=2))
+lines(seq(bins[4,4], bins[4,5], length.out = 2), rep(DLR_val[4], times=2))
+lines(seq(bins[5,4], bins[5,5], length.out = 2), rep(DLR_val[5], times=2))
+lines(seq(bins[6,4], bins[6,5], length.out = 2), rep(DLR_val[6], times=2))
+
+ds1sort<-dov[order(dov$G429),]
+ds1sort$group<-c(rep(1:(6-1), each=66), rep(6, times=66-(6*66-nrow(ds1sort))))
+fit1<-glm(ds1sort$Stage ~ ds1sort$group, family = binomial)
+pred256<-predict(fit1)
+roc256<-roc(ds1sort$Stage, pred256, plot = F)
+ci.sp.obj <- ci.sp(roc256, sensitivities=roc256$sensitivities, boot.n=100)
+plot(roc256, ylim=c(0,1)) # restart a new plot
+plot(ci.sp.obj, type="shape", col="grey", ylim=c(0,1))
+abline(a=1,b=-1, lwd=2)
+
+
+fit1<-MCL(dov[,c(sig_nontrad,8)], 6, 66, 6, 'F')
+DLR_val<-c(fit1[,6]/fit1[1,11], 1/fit1[1,11])
+
+bins<-DLR(dov[,c(sig_nontrad,8)], 6, 66)
+plot(seq(bins[1,4], bins[1,5], length.out = 2), rep(DLR_val[1], times=2), type='l',
+     ylim=c(0,5.5), xlim=c(bins[1,4], bins[6,5]), ylab = 'DLR', xlab = 'Marker', main='Gene: XRN2')
+lines(seq(bins[2,4], bins[2,5], length.out = 2), rep(DLR_val[2], times=2))
+lines(seq(bins[3,4], bins[3,5], length.out = 2), rep(DLR_val[3], times=2))
+lines(seq(bins[4,4], bins[4,5], length.out = 2), rep(DLR_val[4], times=2))
+lines(seq(bins[5,4], bins[5,5], length.out = 2), rep(DLR_val[5], times=2))
+lines(seq(bins[6,4], bins[6,5], length.out = 2), rep(DLR_val[6], times=2))
+
+ds1sort<-dov[order(dov$G364),]
+ds1sort$group<-c(rep(1:(6-1), each=66), rep(6, times=66-(6*66-nrow(ds1sort))))
+fit1<-glm(ds1sort$Stage ~ ds1sort$group, family = binomial)
+pred256<-predict(fit1)
+roc256<-roc(ds1sort$Stage, pred256, plot = F)
+ci.sp.obj <- ci.sp(roc256, sensitivities=roc256$sensitivities, boot.n=100)
+plot(roc256, ylim=c(0,1)) 
+plot(ci.sp.obj, type="shape", col="grey", ylim=c(0,1))
+abline(a=1,b=-1, lwd=2)
+```
+
+
+Obtaining post-test probabilities
+```{r}
+#fit model with stage and age
+fit6<-MCL_covar1_cat(data.frame(cbind(as.numeric(dov$G9), dov$Stage, dov$quartile_age)), 6, 66, 6)
+CA_test_6(cbind(dov$G9, dov[,8]), c(1:6), 66)[[2]]
+CA_test_6(cbind(dov$G9, dov[,8]), c(3,2,1,1,2,3), 66)[[2]]
+# reject CA test with monotone weights -> G9 traditional
+
+#conduct chi-square test of independence
+data<-data.frame(cbind(dov$G9, dov$Stage, dov$quartile_age))
+colnames(data)<-c('marker', 'class', 'age')
+ds1sort<-data[order(data$marker),]
+#create equally sized groups of size BLOCKS to calculate DRL
+ds1sort$group<-c(rep(1:(6-1), each=66), rep(6, times=66-(6*66-nrow(ds1sort))))
+table(ds1sort$group, ds1sort$age)
+chisq.test(table(ds1sort$group, ds1sort$age))
+
+#calculate DLR for each combination of covariates
+DLRS1A1<-function(j){exp(fit6[j,2])*((1+sum(exp(fit6[,1])))/(1+sum(exp(fit6[,1]+fit6[,2]))))}
+DLRS1A2<-function(j){exp(fit6[j,2])*((1+sum(exp(fit6[,1]+fit6[,3])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,3]))))}
+DLRS1A3<-function(j){exp(fit6[j,2])*((1+sum(exp(fit6[,1]+fit6[,4])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,4]))))}
+DLRS1A4<-function(j){exp(fit6[j,2])*((1+sum(exp(fit6[,1]+fit6[,5])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,5]))))}
+
+DLRS1A10<-((1+sum(exp(fit6[,1])))/(1+sum(exp(fit6[,1]+fit6[,2]))))
+DLRS1A20<-((1+sum(exp(fit6[,1]+fit6[,3])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,3]))))
+DLRS1A30<-((1+sum(exp(fit6[,1]+fit6[,4])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,4]))))
+DLRS1A40<-((1+sum(exp(fit6[,1]+fit6[,5])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,5]))))
+
+#plot DLR function adjusted for stage for each age category
+#age group 1
+DLRS1A1_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A1), DLRS1A10), digits=4)
+#age group 2
+DLRS1A2_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A2), DLRS1A20), digits=4)
+#age group 3
+DLRS1A3_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A3), DLRS1A30), digits=4)
+#age group 4
+DLRS1A4_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A4), DLRS1A40), digits=4)
+
+#calculate age DLR
+t3<-table(dov$Stage, dov$quartile_age)
+S1A1<-(t3[2,1]/sum(t3[2,]))/(t3[1,1]/sum(t3[1,]))
+S1A2<-(t3[2,2]/sum(t3[2,]))/(t3[1,2]/sum(t3[1,]))
+S1A3<-(t3[2,3]/sum(t3[2,]))/(t3[1,3]/sum(t3[1,]))
+S1A4<-(t3[2,4]/sum(t3[2,]))/(t3[1,4]/sum(t3[1,]))
+
+#calculate stage DLR
+
+
+#apply serial testing strategy (age applied first, then G9 adjusted for age)
+
+tab1<-cbind(rep(.25, times=24), rep(c('<53', '53-59', '60-66', '>66'), each=6), rep(round(c(S1A1, S1A2, S1A3, S1A4), digits=2), each=6), rep(1:6, times=4), round(bins[,3], digits=2), round(c(DLRS1A1_val, DLRS1A2_val, DLRS1A3_val, DLRS1A4_val), digits=2))
+
+post_odds<-as.numeric(tab1[,1])/(1-as.numeric(tab1[,1]))*as.numeric(tab1[,3])*as.numeric(tab1[,6])
+post_prob<-post_odds/(1+post_odds)
+tab1<-cbind(tab1, round(post_prob, digits=2))
+
+colnames(tab1)<-c('Pre Prob', 'Age','DLR(Age)','Marker interval', 'DLR(G90)','DLR(G90|Age)', 'Post Prob')
+
+#add row if tests had been applied sequentially
+post_odds_seq<-round(c(as.numeric(tab1[1,1])/(1-as.numeric(tab1[1,1]))*S1A1*bins[,3], as.numeric(tab1[1,1])/(1-as.numeric(tab1[1,1]))*S1A2*bins[,3], as.numeric(tab1[1,1])/(1-as.numeric(tab1[1,1]))*S1A3*bins[,3], as.numeric(tab1[1,1])/(1-as.numeric(tab1[1,1]))*S1A4*bins[,3]), digits=2)
+
+post_prob_seq<-post_odds_seq/(1+post_odds_seq)
+
+tab2<-cbind(tab1, post_odds_seq)
+colnames(tab2)<-c('Pre Prob', 'Age','DLR(Age)','Marker interval', 'DLR(G90)','DLR(G90|Age)', 'covariate-adjusted p1', 'indep. p1')
+
+options(xtable.comment = FALSE)
+print(xtable(tab2, label = NULL, caption = 'Post-test probabilities'), include.rownames=FALSE)
+```
+
