@@ -6,7 +6,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = F)
 ```
 
-functions
+Functions
 ```{r}
 #functions
 
@@ -91,41 +91,84 @@ MCL_covar1_cat<-function(data, blocks, blocksize, ref.grp){
   return(f1sum)
 }
 #Cochran-Armitage test with 6 intervals
-CA_test_6<-function(dat1, weights, blocksize){
-  ds1sort<-data.frame(dat1[order(dat1[,1]),])
+CA_test_10<-function(dat1, weights, blocksize){
+  ds1sort<-dat1[order(dat1[,1]),]
   #create equally sized groups of size BLOCKS to calculate DRL
-  ds1sort$group<-c(rep(1:(6-1), each=blocksize), rep(6, times=blocksize+abs((6*blocksize-nrow(ds1sort)))))
+  ds1sort$group<-c(rep(1:(10-1), each=blocksize), rep(10, times=blocksize-(10*blocksize-nrow(ds1sort))))
+  CochranArmitageTest(table(ds1sort[,2], ds1sort$group), alternative = 't')
   
   t1<-table(ds1sort[,2], ds1sort$group)
   R1<-sum(t1[1,])
   R2<-sum(t1[2,])
-  Ci<-c(sum(t1[,1]), sum(t1[,2]),sum(t1[,3]),sum(t1[,4]),sum(t1[,5]),sum(t1[,6]))
+  Ci<-c(sum(t1[,1]),sum(t1[,2]),sum(t1[,3]),sum(t1[,4]),sum(t1[,5]),sum(t1[,6]),sum(t1[,7]),sum(t1[,8]),sum(t1[,9]),sum(t1[,10]))
   
   weights<-weights
   
   CA_TS<-sum(weights*(t1[1,]*R2-t1[2,]*R1))
   
-  V1<-(weights[1]*Ci[1])*(weights[2]*Ci[2] + weights[3]*Ci[3] + weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6])
-  V2<-(weights[2]*Ci[2])*(weights[3]*Ci[3] + weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6])
-  V3<-(weights[3]*Ci[3])*(weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6])
-  V4<-(weights[4]*Ci[4])*(weights[5]*Ci[5] + weights[6]*Ci[6])
-  V5<-(weights[5]*Ci[5])*(weights[6]*Ci[6])
-  Vi<-sum(V1, V2, V3, V4, V5)
+  V1<-(weights[1]*Ci[1])*(weights[2]*Ci[2] + weights[3]*Ci[3] + weights[4]*Ci[4] + weights[5]*Ci[5] +
+                            weights[6]*Ci[6] + weights[7]*Ci[7] + weights[8]*Ci[8] + weights[9]*Ci[9] + weights[10]*Ci[10])
+  V2<-(weights[2]*Ci[2])*(weights[3]*Ci[3] + weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6] +
+                            weights[7]*Ci[7] + weights[8]*Ci[8] + weights[9]*Ci[9] + weights[10]*Ci[10])
+  V3<-(weights[3]*Ci[3])*(weights[4]*Ci[4] + weights[5]*Ci[5] + weights[6]*Ci[6] + weights[7]*Ci[7] +
+                            weights[8]*Ci[8] + weights[9]*Ci[9] + weights[10]*Ci[10])
+  V4<-(weights[4]*Ci[4])*(weights[5]*Ci[5] + weights[6]*Ci[6] + weights[7]*Ci[7] + weights[8]*Ci[8] +
+                            weights[9]*Ci[9] + weights[10]*Ci[10])
+  V5<-(weights[5]*Ci[5])*(weights[6]*Ci[6] + weights[7]*Ci[7] + weights[8]*Ci[8] + weights[9]*Ci[9] + weights[10]*Ci[10])
+  V6<-(weights[6]*Ci[6])*(weights[7]*Ci[7] + weights[8]*Ci[8] + weights[9]*Ci[9] + weights[10]*Ci[10])
+  V7<-(weights[7]*Ci[7])*(weights[8]*Ci[8] + weights[9]*Ci[9] + weights[10]*Ci[10])
+  V8<-(weights[8]*Ci[8])*(weights[9]*Ci[9] + weights[10]*Ci[10])
+  V9<-(weights[9]*Ci[9])*(weights[10]*Ci[10])
+  Vi<-sum(V1, V2, V3, V4, V5, V6, V7, V8, V9)
   
   CA_Var<-((R1*R2)/nrow(dat1))*(sum(((weights**2)*Ci)*(sum(t1[,])-Ci)) - (2*Vi))
   
   q<-abs(CA_TS/sqrt(CA_Var))
   
+  #calculate sigma matrix
+  N<-length(ds1sort$group)
+  c_vec<-colSums(t1)
+  sigma_mat<-diag(c_vec*(N-c_vec))
+  sigma_mat[1,2:10]<--c_vec[1]*c_vec[2:10]
+  sigma_mat[2:10,1]<--c_vec[1]*c_vec[2:10]
+  
+  sigma_mat[2,3:10]<--c_vec[2]*c_vec[3:10]
+  sigma_mat[3:10,2]<--c_vec[2]*c_vec[3:10]
+  
+  sigma_mat[3,4:10]<--c_vec[3]*c_vec[4:10]
+  sigma_mat[4:10,3]<--c_vec[3]*c_vec[4:10]
+  
+  sigma_mat[4,5:10]<--c_vec[4]*c_vec[5:10]
+  sigma_mat[5:10,4]<--c_vec[4]*c_vec[5:10]
+  
+  sigma_mat[5,6:10]<--c_vec[5]*c_vec[6:10]
+  sigma_mat[6:10,5]<--c_vec[5]*c_vec[6:10]
+  
+  sigma_mat[6,7:10]<--c_vec[6]*c_vec[7:10]
+  sigma_mat[7:10,6]<--c_vec[6]*c_vec[7:10]
+  
+  sigma_mat[7,8:10]<--c_vec[7]*c_vec[8:10]
+  sigma_mat[8:10,7]<--c_vec[7]*c_vec[8:10]
+  
+  sigma_mat[8,9:10]<--c_vec[8]*c_vec[9:10]
+  sigma_mat[9:10,8]<--c_vec[8]*c_vec[9:10]
+  
+  sigma_mat[9,10]<--c_vec[9]*c_vec[10]
+  sigma_mat[10,9]<--c_vec[9]*c_vec[10]
+  
+  sigma_mat<-((rowSums(t1)[1]*rowSums(t1)[2])/N)*sigma_mat
+  
   p.val<-pnorm(q, lower.tail = F)*2
   
-  return(list(CA_TS/sqrt(CA_Var), p.val))
+  return(list(CA_TS, p.val, sigma_mat))
 }
+
 
 library(readxl); library(mcp.project); library(caTools); library(nnet);library(msm);library(pROC);library(xtable);library(plyr)
 ```
 
 
-read in data and create outcome
+Read in data and create outcome
 ```{r}
 dov<-read_excel("VAN_HGSOC.xlsx")
 table(dov$Stage)
@@ -133,44 +176,96 @@ dov<-subset(dov, dov$Stage!=8)
 dov$Stage<-ifelse(dov$Stage==1, 0, 1) #recode stage
 ```
 
-LR test
+LR test to identify significant genes
 ```{r}
 dov<-data.frame(dov)
 #apply LRT to all genes
 an_pv_all<-NULL
 for(i in 14:526){ #markers start at column 14
-  fit1<-MCL(dov[,c(i,8)], 6, 66, 6, 'F')[1,12]
+  fit1<-MCL(dov[,c(i,8)], 10, 40, 10, 'F')[1,12]
   an_pv_all<-c(an_pv_all, fit1)
 }
 
 #get adjusted p-values
 adj_pval<-fdr(an_pv_all, method='BH', q=.05)
-table(adj_pval$Pvals$rejected) #136 rejections
+table(adj_pval$Pvals$rejected) #118 rejections
 sig_genes<-which(adj_pval$Pvals$rejected==T)+13 #gives column number of dov for sig genes
 ```
 
 
-CA test
+CA test to categorize significant genes
 ```{r}
 CAtest_all<-NULL
+TS_diff_all<-NULL
+pval_all<-NULL
 for(i in sig_genes){
-  CA_trad<-CA_test_6(cbind(dov[,i], dov[,8]), c(1:6), 66)[[2]]
-  CA_nt<-CA_test_6(cbind(dov[,i], dov[,8]), c(3,2,1,1,2,3), 66)[[2]]
   
-  if(CA_trad<CA_nt){
-    CA_res<-'T'
+  mean_cont<-mean(dov[which(dov$Stage==0),i])
+  mean_case<-mean(dov[which(dov$Stage==1),i])
+  
+  if(mean_cont>mean_case){
+    dov$Stage2<-ifelse(dov$Stage==1, 0, 1)
   } else{
-    CA_res<-'NT'
+    dov$Stage2<-dov$Stage
   }
-
-  CAtest_all<-c(CAtest_all, CA_res)
+  
+  CAtest_trad<-(CA_test_10(data.frame(dov[,i], dov$Stage2), 10:1, 40))
+  CAtest_nt<-(CA_test_10(data.frame(dov[,i], dov$Stage2), c(9,7,5,3,1,0,2,4,6,8), 40))
+  
+  difftruth<-CAtest_trad[[1]]+CAtest_nt[[1]]
+  
+  weight_trad<-matrix(data=c(10:1), nrow = 10)
+  weight_nt<-c(9,7,5,3,1,0,2,4,6,8)
+  var_trad<-t(weight_trad)%*%CAtest_trad[[3]]%*%weight_trad
+  var_nt<-t(weight_nt)%*%CAtest_nt[[3]]%*%weight_nt
+  covar_T<-t(weight_trad)%*%CAtest_trad[[3]]%*%weight_nt
+  
+  (TS_diff<-difftruth/sqrt(var_nt + var_trad + (2*covar_T)))
+  TS_diff_all<-c(TS_diff_all, TS_diff)
+  
+  if(TS_diff<0){
+    p_val1<-pnorm(TS_diff, lower.tail = T)*2
+  } else{
+    p_val1<-pnorm(TS_diff, lower.tail = F)*2
+  }
+  
+  pval_all<-c(pval_all, p_val1)
 }
 
-trad_genes<-sig_genes[which(CAtest_all=='T')] #column # of dov with traditional sig. genes
-nt_genes<-sig_genes[which(CAtest_all=='NT')] #column # of dov with nontraditional sig. genes
+
+trad_genes<-sig_genes[which(TS_diff_all > 0 & pval_all < 0.05)] #column # of dov with traditional sig. genes
+nt_genes<-sig_genes[which(TS_diff_all < 0 & pval_all < 0.05)] #column # of dov with nontraditional sig. genes
+
+length(sig_genes)
+length(nt_genes) + length(trad_genes)
+#21 indeterminate
+#questions:
+#1. what do the 100 trad look like
+#2. What do the 15 NT look like
+#3 what do the 21 indeterminate look like? 
+`%!in%` <- Negate(`%in%`)
+indet <- sig_genes[which(sig_genes %!in% c(trad_genes, nt_genes))]
+
+par(mfrow=c(3,3))
+for(i in indet){
+  colAUC(as.numeric(bin(dov[,i], nbins=10, method='content', labels=c(1:10))), dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+par(mfrow=c(3,3))
+for(i in nt_genes){
+  colAUC(as.numeric(bin(dov[,i], nbins=10, method='content', labels=c(1:10))), dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+par(mfrow=c(3,3))
+for(i in trad_genes){
+  colAUC(as.numeric(bin(dov[,i], nbins=10, method='content', labels=c(1:10))), dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
 ```
 
-AUC test
+AUC test to identify informative markers
 ```{r}
 auc_test_all<-NULL
 for(i in 14:526){
@@ -179,10 +274,56 @@ for(i in 14:526){
 }
 
 #adjust for multiple testing
-table(ifelse(auc_test_all <0.05, 1, 0))
+table(ifelse(auc_test_all <0.05, 1, 0)) #213 rejections
 adj_pval_auc<-fdr(auc_test_all, method='BH', q=.05)
-table(adj_pval_auc$Pvals$rejected) #136 rejections
+table(adj_pval_auc$Pvals$rejected) #166  rejections
 sig_genes_auc<-which(adj_pval_auc$Pvals$rejected==T)+13 #column #s of significant genes by AUC
+```
+
+Test for trend for AUC significant genes
+```{r}
+CAtest_all<-NULL
+TS_diff_all<-NULL
+pval_all<-NULL
+for(i in sig_genes_auc){
+  
+  mean_cont<-mean(dov[which(dov$Stage==0),i])
+  mean_case<-mean(dov[which(dov$Stage==1),i])
+  
+  if(mean_cont>mean_case){
+    dov$Stage2<-ifelse(dov$Stage==1, 0, 1)
+  } else{
+    dov$Stage2<-dov$Stage
+  }
+  
+  CAtest_trad<-(CA_test_10(data.frame(dov[,i], dov$Stage2), 10:1, 40))
+  CAtest_nt<-(CA_test_10(data.frame(dov[,i], dov$Stage2), c(9,7,5,3,1,0,2,4,6,8), 40))
+  
+  difftruth<-CAtest_trad[[1]]+CAtest_nt[[1]]
+  
+  weight_trad<-matrix(data=c(10:1), nrow = 10)
+  weight_nt<-c(9,7,5,3,1,0,2,4,6,8)
+  var_trad<-t(weight_trad)%*%CAtest_trad[[3]]%*%weight_trad
+  var_nt<-t(weight_nt)%*%CAtest_nt[[3]]%*%weight_nt
+  covar_T<-t(weight_trad)%*%CAtest_trad[[3]]%*%weight_nt
+  
+  (TS_diff<-difftruth/sqrt(var_nt + var_trad + (2*covar_T)))
+  TS_diff_all<-c(TS_diff_all, TS_diff)
+  
+  if(TS_diff<0){
+    p_val1<-pnorm(TS_diff, lower.tail = T)*2
+  } else{
+    p_val1<-pnorm(TS_diff, lower.tail = F)*2
+  }
+  
+  pval_all<-c(pval_all, p_val1)
+}
+
+
+trad_genes_auc<-sig_genes_auc[which(TS_diff_all > 0 & pval_all < 0.05)] #column # of dov with traditional sig. genes
+nt_genes_auc<-sig_genes_auc[which(TS_diff_all < 0 & pval_all < 0.05)] #column # of dov with nontraditional sig. genes
+
+indet_auc <- sig_genes_auc[which(sig_genes_auc %!in% c(trad_genes_auc))]
 ```
 
 Compare LRT rejections to AUC rejections
@@ -207,72 +348,257 @@ for(i in auc_miss){
   abline(a=0,b=1)
 }
 
-#14 out of the 21 were on the NT list
-sum(auc_miss %in% nt_genes)/length(auc_miss)
+#11 out of the 26 were on the NT list
+#9 out of the 26 were on the indet
+# 6 out of the 26 were on the trad list
+sum(auc_miss %in% trad_genes)
 
-#The 14 account for what percentage of the total number of NTBs?
+#The 11 account for what percentage of the total number of NTBs? 100%
 sum(auc_miss %in% nt_genes)/length(nt_genes)
 ```
 
-Find most significant traditional and nontraditional with a clear cross point by LRT
+Test for length of ROC curve to identify informative biomarkers
 ```{r}
-ordered_lrt<-cbind(1:513, adj_pval$Pvals)[order(adj_pval$Pvals$adjusted.pvals),]
-ordered_lrt$`1:513` %in% (nt_genes-13)
-#1st entry is a traditional
-#first nontraditional is #34
-ordered_lrt[1,] #G429 is the most significant traditional
-sig_trad<-ordered_lrt[1,1] + 13 #Column # of dov
-ordered_lrt[48,] #G178 is the most significant nontraditional with clear cross point
-sig_nontrad<-ordered_lrt[48,1] + 13 #column # of dov
+length_cont<-length(dov[which(dov$Stage==0),8])
+length_case<-length(dov[which(dov$Stage==1),8])
+
+pval_all_length<-NULL
+for(i in 14:526){
+  mu0<-mean(dov[which(dov$Stage==0),i])
+  mu1<-mean(dov[which(dov$Stage==1),i])
+  sd0<-sd(dov[which(dov$Stage==0),i])
+  sd1<-sd(dov[which(dov$Stage==1),i])
+  
+  #length function
+  l1<-function(x){
+    sqrt(dnorm(x, mu0, sd0)^2 + (dnorm(x, mu1, sd1))^2) #assumes binormal model for markers
+  }
+  
+  l1_est<-integrate(l1, lower=min(dov[,i]), upper = max(dov[,i]))
+  
+  
+  #inference procedure
+  #note that the null hypothesis corresponds to a noninformative biomarker than follows the 45-degree line
+  Z<-((sqrt(2)*4*length_cont*length_case)/(length_cont + length_case))*(l1_est$value - sqrt(2))
+  
+  pval_all_length<-c(pval_all_length, pchisq(Z, 2, lower.tail = F))
+
+}
+
+#adjust for multiple testing
+table(ifelse(pval_all_length <0.05, 1, 0)) #140 rejections
+adj_pval_length<-fdr(pval_all_length, method='BH', q=.05)
+table(adj_pval_length$Pvals$rejected) #73  rejections
+sig_genes_length<-which(adj_pval_length$Pvals$rejected==T)+13 #column #s of significant genes by ROC length
+```
+
+Test for trend for length significant genes
+```{r}
+CAtest_all<-NULL
+TS_diff_all<-NULL
+pval_all<-NULL
+for(i in sig_genes_length){
+  
+  mean_cont<-mean(dov[which(dov$Stage==0),i])
+  mean_case<-mean(dov[which(dov$Stage==1),i])
+  
+  if(mean_cont>mean_case){
+    dov$Stage2<-ifelse(dov$Stage==1, 0, 1)
+  } else{
+    dov$Stage2<-dov$Stage
+  }
+  
+  CAtest_trad<-(CA_test_10(data.frame(dov[,i], dov$Stage2), 10:1, 40))
+  CAtest_nt<-(CA_test_10(data.frame(dov[,i], dov$Stage2), c(9,7,5,3,1,0,2,4,6,8), 40))
+  
+  difftruth<-CAtest_trad[[1]]+CAtest_nt[[1]]
+  
+  weight_trad<-matrix(data=c(10:1), nrow = 10)
+  weight_nt<-c(9,7,5,3,1,0,2,4,6,8)
+  var_trad<-t(weight_trad)%*%CAtest_trad[[3]]%*%weight_trad
+  var_nt<-t(weight_nt)%*%CAtest_nt[[3]]%*%weight_nt
+  covar_T<-t(weight_trad)%*%CAtest_trad[[3]]%*%weight_nt
+  
+  (TS_diff<-difftruth/sqrt(var_nt + var_trad + (2*covar_T)))
+  TS_diff_all<-c(TS_diff_all, TS_diff)
+  
+  if(TS_diff<0){
+    p_val1<-pnorm(TS_diff, lower.tail = T)*2
+  } else{
+    p_val1<-pnorm(TS_diff, lower.tail = F)*2
+  }
+  
+  pval_all<-c(pval_all, p_val1)
+}
+
+
+trad_genes_length<-sig_genes_length[which(TS_diff_all > 0 & pval_all < 0.05)] #column # of dov with traditional sig. genes
+nt_genes_length<-sig_genes_length[which(TS_diff_all < 0 & pval_all < 0.05)] #column # of dov with nontraditional sig. genes
+
+indet_length <- sig_genes_length[which(sig_genes_length %!in% c(trad_genes_length, nt_genes_length))]
+
+par(mfrow=c(3,3))
+for(i in indet_length){
+  colAUC(as.numeric(bin(dov[,i], nbins=10, method='content', labels=c(1:10))), dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+par(mfrow=c(3,3))
+for(i in nt_genes_length){
+  colAUC(as.numeric(bin(dov[,i], nbins=10, method='content', labels=c(1:10))), dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+par(mfrow=c(3,3))
+for(i in trad_genes_length){
+  colAUC(as.numeric(bin(dov[,i], nbins=10, method='content', labels=c(1:10))), dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+```
+
+Compare LRT rejections to length rejections
+```{r}
+table(adj_pval_length$Pvals$rejected, adj_pval$Pvals$rejected)
+#length as rows, LRT as column
+#they agreed on rejecting 58
+#60 that LRT thought were important that length didnt
+#15 that length thought were important that LRT didnt
+#380 they agreed on failing to reject
+
+#look at the 60 length missed
+discord_pairs<-ifelse(adj_pval_length$Pvals$rejected==F & adj_pval$Pvals$rejected==T, 1, 0)
+length_miss<-which(discord_pairs==1)+13 #column numbers of the biomarkers the AUC test missed compared to the LR test
+#look at the 15 LRT missed
+discord_pairs2<-ifelse(adj_pval_length$Pvals$rejected==T & adj_pval$Pvals$rejected==F, 1, 0)
+length_miss2<-which(discord_pairs2==1)+13
+```
+
+Plot the 60 length missed
+```{r}
+par(mfrow=c(3,3))
+for(i in length_miss){
+  colAUC(dov[,i], dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+#37 out of the 60 were on the trad list
+#10 out of the 60 were on the ntrad list
+#13 out of the 60 were on the nt list
+sum(length_miss %in% nt_genes)
+length_miss_nt<-length_miss[which(length_miss %in% nt_genes)]
+par(mfrow=c(3,3))
+rov_miss_all<-NULL
+auc_tradmiss_all<-NULL
+for(i in length_miss_nt){
+  auc_tradmiss<-colAUC(dov[,i], dov[,8], plotROC = F)
+  #abline(a=0,b=1)
+  auc_tradmiss_all<-c(auc_tradmiss_all, auc_tradmiss)
+  
+  rov<-sd(dov[which(dov$Stage==1),i])/sd(dov[which(dov$Stage==0),i])
+  rov<-ifelse(rov<1, 1/rov, rov)
+  rov_miss_all<-c(rov_miss_all, rov)
+}
+summary(rov_miss_all)
+summary(auc_tradmiss_all)
+
+
+#plot the 15 that LRT missed but length picked up
+par(mfrow=c(4,4))
+for(i in length_miss2){
+  colAUC(dov[,i], dov[,8], plotROC = T)
+  abline(a=0,b=1)
+}
+
+sum(length_miss2 %in% indet_length)
+#of the 15, 9 were in the trad_length group, 1 in the nt_length group, and 5 in the indet_length group
+miss2_trad<-length_miss2[which(length_miss2 %in% trad_genes_length)]
+  auc_miss_all<-NULL
+  for(i in miss2_trad){
+    auc_miss_all<-c(auc_miss_all, colAUC(dov[,i], dov[,8], plotROC = F))
+  }
+  summary(auc_miss_all)
+
+  miss2_nt<-length_miss2[which(length_miss2 %in% nt_genes_length)]
+  rov_miss_all<-NULL
+  for(i in miss2_nt){
+    rov<-sd(dov[which(dov$Stage==1),i])/sd(dov[which(dov$Stage==0),i])
+    rov<-ifelse(rov<1, 1/rov, rov)
+    rov_miss_all<-c(rov_miss_all, rov)
+  }
+  summary(rov_miss_all)
+miss2_indet<-length_miss2[which(length_miss2 %in% indet_length)]
+```
+
+Find most significant traditional and nontraditional
+```{r}
+#most sig. nontrad by LRT
+nt_genes[which(cbind(nt_genes, an_pv_all[nt_genes - 13])[,2] == min(cbind(nt_genes, an_pv_all[nt_genes - 13])[,2]))]
+colnames(dov)[377]
+
+#most sig. trad by LRT
+trad_genes[which(cbind(trad_genes, an_pv_all[trad_genes - 13])[,2] == min(cbind(trad_genes, an_pv_all[trad_genes - 13])[,2]))]
+colnames(dov)[442]
 ```
 
 
 Plots of most significant traditional and nontraditional
 ```{r}
 par(mfrow=c(2,2))
-fit1<-MCL(dov[,c(sig_trad,8)], 6, 66, 6, 'F')
+fit1<-MCL(dov[,c(442,8)], 10, 40, 10, 'F')
 DLR_val<-c(fit1[,6]/fit1[1,11], 1/fit1[1,11])
 
-bins<-DLR(dov[,c(sig_trad,8)], 6, 66)
+bins<-DLR(dov[,c(442,8)], 10, 40)
 par(mfrow=c(2,2))
 plot(seq(bins[1,4], bins[1,5], length.out = 2), rep(DLR_val[1], times=2), type='l', 
-     ylim=c(0,8.5), xlim=c(bins[1,4], bins[6,5]), ylab = 'DLR', xlab = 'Marker', main='Gene: PCDH9')
+     ylim=c(0,5.5), xlim=c(bins[1,4], bins[10,5]), ylab = 'DLRj', xlab = 'log-standardized marker', main='DLR Curve', sub='Gene: PCDH9', xaxt='n', cex.lab=1.2, cex.axis=1.2)
+abline(h=1, lty=2, col='grey')
 lines(seq(bins[2,4], bins[2,5], length.out = 2), rep(DLR_val[2], times=2))
 lines(seq(bins[3,4], bins[3,5], length.out = 2), rep(DLR_val[3], times=2))
 lines(seq(bins[4,4], bins[4,5], length.out = 2), rep(DLR_val[4], times=2))
 lines(seq(bins[5,4], bins[5,5], length.out = 2), rep(DLR_val[5], times=2))
 lines(seq(bins[6,4], bins[6,5], length.out = 2), rep(DLR_val[6], times=2))
+lines(seq(bins[7,4], bins[7,5], length.out = 2), rep(DLR_val[7], times=2))
+lines(seq(bins[8,4], bins[8,5], length.out = 2), rep(DLR_val[8], times=2))
+lines(seq(bins[9,4], bins[9,5], length.out = 2), rep(DLR_val[9], times=2))
+lines(seq(bins[10,4], bins[10,5], length.out = 2), rep(DLR_val[10], times=2))
+axis(1, at=c(bins[,4], bins[10,5]), labels=round(c(bins[,4], bins[10,5]), digits=1), cex.axis=1)
 
 ds1sort<-dov[order(dov$G429),]
-ds1sort$group<-c(rep(1:(6-1), each=66), rep(6, times=66-(6*66-nrow(ds1sort))))
+ds1sort$group<-c(rep(1:(10-1), each=40), rep(10, times=40-(10*40-nrow(ds1sort))))
 fit1<-glm(ds1sort$Stage ~ ds1sort$group, family = binomial)
-pred256<-predict(fit1)
-roc256<-roc(ds1sort$Stage, pred256, plot = F)
-ci.sp.obj <- ci.sp(roc256, sensitivities=roc256$sensitivities, boot.n=100)
-plot(roc256, ylim=c(0,1)) # restart a new plot
+pred429<-predict(fit1)
+roc429<-roc(ds1sort$Stage, pred429, plot = F)
+ci.sp.obj <- ci.sp(roc429, sensitivities=roc429$sensitivities, boot.n=100)
+plot(roc429, ylim=c(0,1), main='ROC Curve', cex.lab=1.2, cex.axis=1.2) # restart a new plot
 plot(ci.sp.obj, type="shape", col="grey", ylim=c(0,1))
 abline(a=1,b=-1, lwd=2)
 
 
-fit1<-MCL(dov[,c(sig_nontrad,8)], 6, 66, 6, 'F')
+fit1<-MCL(dov[,c(377,8)], 10, 40, 10, 'F')
 DLR_val<-c(fit1[,6]/fit1[1,11], 1/fit1[1,11])
 
-bins<-DLR(dov[,c(sig_nontrad,8)], 6, 66)
+bins<-DLR(dov[,c(377,8)], 10, 40)
 plot(seq(bins[1,4], bins[1,5], length.out = 2), rep(DLR_val[1], times=2), type='l',
-     ylim=c(0,5.5), xlim=c(bins[1,4], bins[6,5]), ylab = 'DLR', xlab = 'Marker', main='Gene: XRN2')
+     ylim=c(0,5.5), xlim=c(bins[1,4], bins[10,5]), ylab = 'DLRj', xlab = 'log-standardized marker', main='DLR Curve', sub='Gene: XRN2', xaxt='n', cex.lab=1.2, cex.axis=1.2)
+abline(h=1, lty=2, col='grey')
 lines(seq(bins[2,4], bins[2,5], length.out = 2), rep(DLR_val[2], times=2))
 lines(seq(bins[3,4], bins[3,5], length.out = 2), rep(DLR_val[3], times=2))
 lines(seq(bins[4,4], bins[4,5], length.out = 2), rep(DLR_val[4], times=2))
 lines(seq(bins[5,4], bins[5,5], length.out = 2), rep(DLR_val[5], times=2))
 lines(seq(bins[6,4], bins[6,5], length.out = 2), rep(DLR_val[6], times=2))
+lines(seq(bins[7,4], bins[7,5], length.out = 2), rep(DLR_val[7], times=2))
+lines(seq(bins[8,4], bins[8,5], length.out = 2), rep(DLR_val[8], times=2))
+lines(seq(bins[9,4], bins[9,5], length.out = 2), rep(DLR_val[9], times=2))
+lines(seq(bins[10,4], bins[10,5], length.out = 2), rep(DLR_val[10], times=2))
+axis(1, at=c(bins[,4], bins[10,5]), labels=round(c(bins[,4], bins[10,5]), digits=1), cex.axis=1)
 
 ds1sort<-dov[order(dov$G364),]
-ds1sort$group<-c(rep(1:(6-1), each=66), rep(6, times=66-(6*66-nrow(ds1sort))))
+ds1sort$group<-c(rep(1:(10-1), each=40), rep(10, times=40-(10*40-nrow(ds1sort))))
 fit1<-glm(ds1sort$Stage ~ ds1sort$group, family = binomial)
-pred256<-predict(fit1)
-roc256<-roc(ds1sort$Stage, pred256, plot = F)
-ci.sp.obj <- ci.sp(roc256, sensitivities=roc256$sensitivities, boot.n=100)
-plot(roc256, ylim=c(0,1)) 
+pred364<-predict(fit1)
+roc364<-roc(ds1sort$Stage, pred364, plot = F)
+ci.sp.obj <- ci.sp(roc364, sensitivities=roc364$sensitivities, boot.n=100)
+plot(roc364, ylim=c(0,1), main='ROC Curve', cex.lab=1.2, cex.axis=1.2) 
 plot(ci.sp.obj, type="shape", col="grey", ylim=c(0,1))
 abline(a=1,b=-1, lwd=2)
 ```
@@ -281,19 +607,18 @@ abline(a=1,b=-1, lwd=2)
 Obtaining post-test probabilities
 ```{r}
 #fit model with stage and age
-fit6<-MCL_covar1_cat(data.frame(cbind(as.numeric(dov$G9), dov$Stage, dov$quartile_age)), 6, 66, 6)
-CA_test_6(cbind(dov$G9, dov[,8]), c(1:6), 66)[[2]]
-CA_test_6(cbind(dov$G9, dov[,8]), c(3,2,1,1,2,3), 66)[[2]]
-# reject CA test with monotone weights -> G9 traditional
+fit6<-MCL_covar1_cat(data.frame(cbind(as.numeric(dov[,447]), dov$Stage, dov$quartile_age)), 10, 40, 10)
+
+447 %in% trad_genes
 
 #conduct chi-square test of independence
-data<-data.frame(cbind(dov$G9, dov$Stage, dov$quartile_age))
+data<-data.frame(cbind(dov$G434, dov$Stage, dov$quartile_age))
 colnames(data)<-c('marker', 'class', 'age')
 ds1sort<-data[order(data$marker),]
 #create equally sized groups of size BLOCKS to calculate DRL
-ds1sort$group<-c(rep(1:(6-1), each=66), rep(6, times=66-(6*66-nrow(ds1sort))))
+ds1sort$group<-c(rep(1:(10-1), each=40), rep(10, times=40-(10*40-nrow(ds1sort))))
 table(ds1sort$group, ds1sort$age)
-chisq.test(table(ds1sort$group, ds1sort$age))
+chisq.test(table(ds1sort$group, ds1sort$age)) #marker group and age are not independent
 
 #calculate DLR for each combination of covariates
 DLRS1A1<-function(j){exp(fit6[j,2])*((1+sum(exp(fit6[,1])))/(1+sum(exp(fit6[,1]+fit6[,2]))))}
@@ -308,13 +633,13 @@ DLRS1A40<-((1+sum(exp(fit6[,1]+fit6[,5])))/(1+sum(exp(fit6[,1]+fit6[,2]+fit6[,5]
 
 #plot DLR function adjusted for stage for each age category
 #age group 1
-DLRS1A1_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A1), DLRS1A10), digits=4)
+DLRS1A1_val<-round(c(sapply(X=c(1:9), FUN=DLRS1A1), DLRS1A10), digits=4)
 #age group 2
-DLRS1A2_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A2), DLRS1A20), digits=4)
+DLRS1A2_val<-round(c(sapply(X=c(1:9), FUN=DLRS1A2), DLRS1A20), digits=4)
 #age group 3
-DLRS1A3_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A3), DLRS1A30), digits=4)
+DLRS1A3_val<-round(c(sapply(X=c(1:9), FUN=DLRS1A3), DLRS1A30), digits=4)
 #age group 4
-DLRS1A4_val<-round(c(sapply(X=c(1:5), FUN=DLRS1A4), DLRS1A40), digits=4)
+DLRS1A4_val<-round(c(sapply(X=c(1:9), FUN=DLRS1A4), DLRS1A40), digits=4)
 
 #calculate age DLR
 t3<-table(dov$Stage, dov$quartile_age)
@@ -323,12 +648,9 @@ S1A2<-(t3[2,2]/sum(t3[2,]))/(t3[1,2]/sum(t3[1,]))
 S1A3<-(t3[2,3]/sum(t3[2,]))/(t3[1,3]/sum(t3[1,]))
 S1A4<-(t3[2,4]/sum(t3[2,]))/(t3[1,4]/sum(t3[1,]))
 
-#calculate stage DLR
-
-
 #apply serial testing strategy (age applied first, then G9 adjusted for age)
 
-tab1<-cbind(rep(.25, times=24), rep(c('<53', '53-59', '60-66', '>66'), each=6), rep(round(c(S1A1, S1A2, S1A3, S1A4), digits=2), each=6), rep(1:6, times=4), round(bins[,3], digits=2), round(c(DLRS1A1_val, DLRS1A2_val, DLRS1A3_val, DLRS1A4_val), digits=2))
+tab1<-cbind(rep(.25, times=40), rep(c('<53', '53-59', '60-66', '>66'), each=10), rep(round(c(S1A1, S1A2, S1A3, S1A4), digits=2), each=10), rep(1:10, times=4), round(bins[,3], digits=2), round(c(DLRS1A1_val, DLRS1A2_val, DLRS1A3_val, DLRS1A4_val), digits=2))
 
 post_odds<-as.numeric(tab1[,1])/(1-as.numeric(tab1[,1]))*as.numeric(tab1[,3])*as.numeric(tab1[,6])
 post_prob<-post_odds/(1+post_odds)
@@ -341,7 +663,7 @@ post_odds_seq<-round(c(as.numeric(tab1[1,1])/(1-as.numeric(tab1[1,1]))*S1A1*bins
 
 post_prob_seq<-post_odds_seq/(1+post_odds_seq)
 
-tab2<-cbind(tab1, post_odds_seq)
+tab2<-cbind(tab1, round(post_prob_seq, digits=2))
 colnames(tab2)<-c('Pre Prob', 'Age','DLR(Age)','Marker interval', 'DLR(G90)','DLR(G90|Age)', 'covariate-adjusted p1', 'indep. p1')
 
 options(xtable.comment = FALSE)
